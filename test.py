@@ -85,7 +85,7 @@ class Combine(nn.Module):
 num_filters_init = 8  # initial num of filters -- see class definition
 in_channels = 3  # num channels of the signal -- equal to 3 for our raw triaxial timeseries
 output_size = 1  # number of classes (sleep, sedentary, etc...)
-num_epoch = 20  # num epochs (full loops though the training set) for SGD training
+num_epoch = 2  # num epochs (full loops though the training set) for SGD training
 lr = 1e-3  # learning rate in SGD
 batch_size = 1  # size of the mini-batch in SGD
 
@@ -168,6 +168,8 @@ kappa_history = []
 loss_history = []
 loss_history_train = []
 batch_size = 1
+best_kappa = 0
+
 for i in tqdm(range(num_epoch)):
     dataloader = create_dataloader(X_train, y_train, batch_size, shuffle=True)
     losses = []
@@ -205,8 +207,9 @@ for i in tqdm(range(num_epoch)):
     balanced_accuracy_history.append(scores_test['balanced_accuracy'])
     kappa_history.append(scores_test['kappa'])
 
-
-torch.save(cnnlstm.state_dict(), 'cnnlstm.mdl')
+    if scores_test['kappa'] > best_kappa:
+        torch.save(cnnlstm.state_dict(), '%.3f_cnnlstm.mdl' % (scores_test['kappa']))
+        best_kappa = scores_test['kappa']
 
 # Loss history
 fig, ax = plt.subplots()
