@@ -10,7 +10,6 @@ from torch.autograd import Variable
 # For reproducibility
 import utils
 
-
 np.random.seed(42)
 torch.manual_seed(42)
 cudnn.benchmark = True
@@ -26,6 +25,10 @@ X_train = np.load('trans_x_train.npy', allow_pickle=True)
 y_train = np.load('trans_y_train.npy', allow_pickle=True)
 X_test = np.load('trans_x_test.npy', allow_pickle=True)
 y_test = np.load('trans_y_test.npy', allow_pickle=True)
+
+
+X_train = X_train[:3]
+y_train = y_train[:3]
 
 ######## Network arch #######
 class ConvBNReLU(nn.Module):
@@ -50,11 +53,10 @@ class ConvBNReLU(nn.Module):
 class Combine(nn.Module):
     def __init__(self, num_hn=128, num_class=5, grad_clip=1.0):  # num_hn=128
         super(Combine, self).__init__()
-        cnnoutputsize = 191488  # 234
+        cnnoutputsize = 191616  # 234
         self.conv1 = ConvBNReLU(3, 32)
         self.conv2 = ConvBNReLU(32, 32)
         self.conv3 = ConvBNReLU(32, 64)
-        self.conv4 = ConvBNReLU(64, 64)
         self.grad_clip = grad_clip
 
         self.rnn1 = nn.LSTM(
@@ -74,7 +76,6 @@ class Combine(nn.Module):
         x = self.conv1(c_in)
         x = self.conv2(x)
         x = self.conv3(x)
-        x = self.conv4(x)
 
         r_in = x.view(batch_size, timesteps, -1)
         r_out, (h_n, h_c) = self.rnn1(r_in)
@@ -83,12 +84,12 @@ class Combine(nn.Module):
         r_out2 = self.linear(r_out)
         return F.log_softmax(r_out2, dim=1)
 
-
+### Feed data
 
 num_filters_init = 8  # initial num of filters -- see class definition
 in_channels = 3  # num channels of the signal -- equal to 3 for our raw triaxial timeseries
 output_size = 1  # number of classes (sleep, sedentary, etc...)
-num_epoch = 15  # num epochs (full loops though the training set) for SGD training
+num_epoch = 2  # num epochs (full loops though the training set) for SGD training
 lr = 1e-3  # learning rate in SGD
 batch_size = 1  # size of the mini-batch in SGD
 
@@ -99,8 +100,8 @@ loss_fn = nn.CrossEntropyLoss()
 optimizer = optim.Adam(cnnlstm.parameters(), lr=lr, amsgrad=True)
 print(cnnlstm)
 
-### Data loading
 
+### Data loading
 def create_dataloader(X, y=None, batch_size=1, shuffle=False):
     ''' Create a (batch) iterator over the dataset. Alternatively, use PyTorch's
     Dataset and DataLoader classes -- See
@@ -121,35 +122,47 @@ def create_dataloader(X, y=None, batch_size=1, shuffle=False):
             seq_tensor[idx, :seqlen] = torch.LongTensor(seq)
 
         # X_batch = torch.from_numpy(seq_tensor)
-        y_batch = y[idxs_batch]
-        y_tensor = Variable(torch.zeros((batch_size, max_len))).long()
-        for idx, (seq, seqlen) in enumerate(zip(y_batch, seq_lengths)):
-            y_tensor[idx, :seqlen] = torch.LongTensor(seq)
 
-        yield seq_tensor, y_tensor
+        if y is None:
+            yield seq_tensor
+        else:
+            y_batch = y[idxs_batch]
+            y_tensor = Variable(torch.zeros((batch_size, max_len))).long()
+            for idx, (seq, seqlen) in enumerate(zip(y_batch, seq_lengths)):
+                y_tensor[idx, :seqlen] = torch.LongTensor(seq)
+            yield seq_tensor, y_tensor
 
 
-def forward_by_batches(model, X):
+def forward_by_batches(model, X, Y):
     ''' Forward pass model on a dataset. Do this by batches so that we do
     not blow up the memory. '''
-    Y = []
+    Y_hat = []
+    true_Y = []
     model.eval()
     with torch.no_grad():
-        for x in create_dataloader(X, batch_size=1024, shuffle=False):  # do not shuffle here!
+        for x, target in create_dataloader(X, Y, batch_size=1, shuffle=False):  # do not shuffle here!
             x = x.to(device)
-            Y.append(model(x))
+            target = target.to(device)
+            Y_hat.append(model(x))
+
+            true_Y.append(target)
     model.train()
-    Y = torch.cat(Y)
-    return Y
+    Y_hat = torch.cat(Y_hat)
+    true_Y = torch.cat(true_Y)
+    return Y_hat.view(-1, 5), true_Y.view(-1)
 
 
 def evaluate_model(model, X, y):
-    Y_pred = forward_by_batches(model, X)  # scores
-    loss = F.cross_entropy(Y_pred, torch.from_numpy(y).to(device)).item()
+    max_len = 1722
+    Y_pred, true_Y = forward_by_batches(model, X, y)  # scores
+    print(Y_pred.size())
+    print(true_Y.size())
+
+    loss = F.cross_entropy(Y_pred, true_Y).item()
     Y_pred = F.softmax(Y_pred, dim=1)  # convert to probabilities
     y_pred = torch.argmax(Y_pred, dim=1)  # convert to classes
     y_pred = y_pred.cpu().numpy()  # cast to numpy array
-    scores = utils.compute_scores(y, y_pred)
+    scores = utils.compute_scores(true_Y.cpu().numpy(), y_pred)
     return loss, scores
 
 

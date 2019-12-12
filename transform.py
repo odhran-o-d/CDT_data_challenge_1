@@ -18,7 +18,6 @@ else:
     print("Using {}".format(device))
 
 
-
 data = np.load('capture24.npz', allow_pickle=True)
 print("Contents of capture24.npz:", data.files)
 X_feats, y, pid, time, annotation = \
@@ -49,21 +48,23 @@ def interval2seq(mydata):
         sub_raw = X_raw[pid == subject]
         y_row = y[pid == subject]
 
-        X_tr.append(np.split(sub_raw, [int(len(sub_raw) / 2)])[0])
-        X_tr.append(np.split(sub_raw, [int(len(sub_raw) / 2)])[1])
+        X_tr.append(np.split(sub_raw, [int(len(sub_raw) / 3), int(len(sub_raw) * 2 / 3)])[0])
+        X_tr.append(np.split(sub_raw, [int(len(sub_raw) / 3), int(len(sub_raw) * 2 / 3)])[1])
+        X_tr.append(np.split(sub_raw, [int(len(sub_raw) / 3), int(len(sub_raw) * 2 / 3)])[2])
 
-        y_tr.append(np.split(y_row, [int(len(y_row) / 2)])[0])
-        y_tr.append(np.split(y_row, [int(len(y_row) / 2)])[1])
+        y_tr.append(np.split(y_row, [int(len(y_row) / 3), int(len(y_row) * 2 / 3)])[0])
+        y_tr.append(np.split(y_row, [int(len(y_row) / 3), int(len(y_row) * 2 / 3)])[1])
+        y_tr.append(np.split(y_row, [int(len(y_row) / 3), int(len(y_row) * 2 / 3)])[2])
 
+        pid_tr.append(subject)
         pid_tr.append(subject)
         pid_tr.append(subject)
 
     x = np.array(X_tr)
     y = np.array(y_tr)
-    pid = np.array(pid_tr)
+    pid_tr = np.array(pid_tr)
 
-    return x, y, pid
-
+    return x, y, pid_tr
 
 x, y, pid = interval2seq(data)
 
@@ -82,10 +83,8 @@ pid_train, pid_test = pid[mask_train], pid[mask_test]
 # X[mask_train] and X[mask_test] if you like to live dangerously
 X_train = utils.ArrayFromMask(x, mask_train)
 X_test = utils.ArrayFromMask(x, mask_test)
-print("Shape of X_train", X_train.shape)
-print("Shape of X_test", X_test.shape)
 
 np.save('trans_x_train', X_train)
 np.save('trans_y_train', y_train)
 np.save('trans_x_test', X_test)
-np.save('trans_y_test', y_train)
+np.save('trans_y_test', y_test)
