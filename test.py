@@ -26,10 +26,6 @@ y_train = np.load('trans_y_train.npy', allow_pickle=True)
 X_test = np.load('trans_x_test.npy', allow_pickle=True)
 y_test = np.load('trans_y_test.npy', allow_pickle=True)
 
-
-X_train = X_train[:3]
-y_train = y_train[:3]
-
 ######## Network arch #######
 class ConvBNReLU(nn.Module):
     ''' Convolution + batch normalization + ReLU is a common trio '''
@@ -89,7 +85,7 @@ class Combine(nn.Module):
 num_filters_init = 8  # initial num of filters -- see class definition
 in_channels = 3  # num channels of the signal -- equal to 3 for our raw triaxial timeseries
 output_size = 1  # number of classes (sleep, sedentary, etc...)
-num_epoch = 2  # num epochs (full loops though the training set) for SGD training
+num_epoch = 20  # num epochs (full loops though the training set) for SGD training
 lr = 1e-3  # learning rate in SGD
 batch_size = 1  # size of the mini-batch in SGD
 
@@ -220,6 +216,7 @@ ax.set_ylabel('loss')
 ax.set_xlabel('epoch')
 ax.legend()
 fig.show()
+plt.savefig('loss.png')
 
 # Scores history
 fig, ax = plt.subplots()
@@ -230,6 +227,7 @@ ax.set_ylabel('score')
 ax.set_xlabel('epoch')
 ax.legend()
 fig.show()
+plt.savefig('score.png')
 
 # Scores details -- last epoch
 utils.print_scores(scores_test)
